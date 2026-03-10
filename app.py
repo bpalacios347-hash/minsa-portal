@@ -5,7 +5,7 @@ import json
 from werkzeug.security import generate_password_hash, check_password_hash
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-import random
+import secrets
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
@@ -64,7 +64,9 @@ def init_db():
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS users
-                 (id INTEGER PRIMARY KEY, username TEXT UNIQUE, password TEXT, name TEXT, address TEXT, phone TEXT, city TEXT)''')
+                 (id INTEGER PRIMARY KEY, username TEXT UNIQUE, password TEXT, name TEXT, address TEXT, phone TEXT, city TEXT, chronic_disease TEXT, viral_disease TEXT, treatment_date TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS sessions
+                 (id INTEGER PRIMARY KEY, user_id INTEGER, token TEXT UNIQUE, expires_at TEXT, FOREIGN KEY(user_id) REFERENCES users(id))''')
     # Add new columns if not exist
     try:
         c.execute("ALTER TABLE users ADD COLUMN chronic_disease TEXT")
@@ -83,8 +85,32 @@ def init_db():
 
 init_db()
 
+def check_token():
+    token = request.cookies.get('session_token')
+    if token:
+        conn = sqlite3.connect('users.db')
+        c = conn.cursor()
+        c.execute("SELECT user_id, expires_at FROM sessions WHERE token = ?", (token,))
+        session_data = c.fetchone()
+        conn.close()
+        if session_data:
+            user_id, expires_at_str = session_data
+            expires_at = datetime.fromisoformat(expires_at_str)
+            if datetime.now() < expires_at:
+                # Set session
+                conn = sqlite3.connect('users.db')
+                c = conn.cursor()
+                c.execute("SELECT username FROM users WHERE id = ?", (user_id,))
+                user = c.fetchone()
+                conn.close()
+                if user:
+                    session['username'] = user[0]
+                    return True
+    return False
+
 @app.route('/')
 def home():
+    check_token()
     if 'username' in session:
         return redirect(url_for('welcome'))
     return render_template('index.html')
@@ -132,20 +158,32 @@ def login():
 
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
-    c.execute("SELECT password FROM users WHERE username = ?", (username,))
+    c.execute("SELECT id, password FROM users WHERE username = ?", (username,))
     user = c.fetchone()
     conn.close()
 
-    if user and check_password_hash(user[0], password):
+    if user and check_password_hash(user[1], password):
+        user_id = user[0]
         session['username'] = username
         session.permanent = True
-        return redirect(url_for('welcome'))
+        # Generate token
+        token = secrets.token_urlsafe(32)
+        expires_at = datetime.now() + timedelta(days=30)
+        conn = sqlite3.connect('users.db')
+        c = conn.cursor()
+        c.execute("INSERT INTO sessions (user_id, token, expires_at) VALUES (?, ?, ?)", (user_id, token, expires_at.isoformat()))
+        conn.commit()
+        conn.close()
+        resp = redirect(url_for('welcome'))
+        resp.set_cookie('session_token', token, max_age=30*24*3600, httponly=True)
+        return resp
     else:
         flash('Nombre de usuario o contraseña incorrectos.')
         return redirect(url_for('home'))
 
 @app.route('/welcome')
 def welcome():
+    check_token()
     if 'username' in session:
         conn = sqlite3.connect('users.db')
         c = conn.cursor()
@@ -162,8 +200,17 @@ def welcome():
 
 @app.route('/logout')
 def logout():
+    token = request.cookies.get('session_token')
+    if token:
+        conn = sqlite3.connect('users.db')
+        c = conn.cursor()
+        c.execute("DELETE FROM sessions WHERE token = ?", (token,))
+        conn.commit()
+        conn.close()
     session.pop('username', None)
-    return redirect(url_for('home'))
+    resp = redirect(url_for('home'))
+    resp.set_cookie('session_token', '', max_age=0)
+    return resp
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
