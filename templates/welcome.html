@@ -129,5 +129,20 @@
             </div>
         </div>
     </div>
+    <script>
+        function playBeep() {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            oscillator.frequency.setValueAtTime(800, audioContext.currentTime); // Frequency in Hz (800 for a pleasant beep)
+            oscillator.type = 'sine';
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime); // Volume
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.2); // Duration: 200ms
+        }
+        window.addEventListener('load', playBeep); // Play beep when page loads (after login/session start)
+    </script>
 </body>
 </html>
