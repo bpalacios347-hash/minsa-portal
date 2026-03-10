@@ -14,15 +14,12 @@ SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/au
 SPREADSHEET_ID = "1jExxsuOZIecLZmjw4OaSEJdPwm34fjXLH-f2z59VDU0"
 
 def get_sheet():
-    # Intentar leer de variable de entorno (para Render)
+    # Leer de variable de entorno (para Render)
     creds_json = os.environ.get('GOOGLE_CREDENTIALS')
-    if creds_json:
-        creds_dict = json.loads(creds_json)
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
-    else:
-        # Leer de archivo (para local)
-        CREDS_FILE = "credentials.json"
-        creds = ServiceAccountCredentials.from_json_keyfile_name(CREDS_FILE, SCOPE)
+    if not creds_json:
+        raise ValueError("GOOGLE_CREDENTIALS no configurada")
+    creds_dict = json.loads(creds_json)
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
     client = gspread.authorize(creds)
     sheet = client.open_by_key(SPREADSHEET_ID).sheet1
     return sheet
