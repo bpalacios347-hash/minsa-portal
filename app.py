@@ -5,6 +5,8 @@ import json
 from werkzeug.security import generate_password_hash, check_password_hash
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import random
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 app.secret_key = 'tu_clave_secreta_aqui'  # Cambia esto en producción
@@ -12,6 +14,32 @@ app.secret_key = 'tu_clave_secreta_aqui'  # Cambia esto en producción
 # Configuración de Google Sheets
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 SPREADSHEET_ID = "1jExxsuOZIecLZmjw4OaSEJdPwm34fjXLH-f2z59VDU0"
+
+CHRONIC_DISEASES = [
+    "Diabetes Mellitus Tipo 2",
+    "Hipertensión Arterial",
+    "Asma Bronquial",
+    "Artritis Reumatoide",
+    "Enfermedad Pulmonar Obstructiva Crónica (EPOC)",
+    "Insuficiencia Cardiaca",
+    "Osteoporosis",
+    "Enfermedad Renal Crónica",
+    "Depresión Mayor",
+    "Esclerosis Múltiple"
+]
+
+VIRAL_DISEASES = [
+    "Influenza",
+    "COVID-19",
+    "Hepatitis B",
+    "Hepatitis C",
+    "Varicela",
+    "Sarampión",
+    "Paperas",
+    "Rubeola",
+    "Dengue",
+    "Zika"
+]
 
 def get_sheet():
     # Leer de variable de entorno (para Render)
@@ -24,7 +52,7 @@ def get_sheet():
     sheet = client.open_by_key(SPREADSHEET_ID).sheet1
     # Agregar encabezados si la sheet está vacía
     if sheet.row_count == 0:
-        sheet.append_row(["Expediente", "Nombre", "Dirección", "Teléfono", "Ciudad"])
+        sheet.append_row(["Expediente", "Nombre", "Dirección", "Teléfono", "Ciudad", "Enfermedad Crónica", "Enfermedad Viral", "Fecha de Tratamiento"])
     return sheet
 
 # Crear base de datos si no existe
@@ -33,6 +61,19 @@ def init_db():
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS users
                  (id INTEGER PRIMARY KEY, username TEXT UNIQUE, password TEXT, name TEXT, address TEXT, phone TEXT, city TEXT)''')
+    # Add new columns if not exist
+    try:
+        c.execute("ALTER TABLE users ADD COLUMN chronic_disease TEXT")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        c.execute("ALTER TABLE users ADD COLUMN viral_disease TEXT")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        c.execute("ALTER TABLE users ADD COLUMN treatment_date TEXT")
+    except sqlite3.OperationalError:
+        pass
     conn.commit()
     conn.close()
 
@@ -52,15 +93,23 @@ def register():
     city = request.form['city']
     hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
 
+    # Generate random diseases and date
+    chronic = random.choice(CHRONIC_DISEASES)
+    viral = random.choice(VIRAL_DISEASES)
+    start_date = datetime(2020, 1, 1)
+    end_date = datetime.now()
+    random_date = start_date + timedelta(days=random.randint(0, (end_date - start_date).days))
+    treatment_date = random_date.strftime("%d/%m/%Y")
+
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
     try:
-        c.execute("INSERT INTO users (username, password, name, address, phone, city) VALUES (?, ?, ?, ?, ?, ?)", (username, hashed_password, name, address, phone, city))
+        c.execute("INSERT INTO users (username, password, name, address, phone, city, chronic_disease, viral_disease, treatment_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (username, hashed_password, name, address, phone, city, chronic, viral, treatment_date))
         conn.commit()
         # Guardar en Google Sheets
         try:
             sheet = get_sheet()
-            sheet.append_row([username, name, address, phone, city])
+            sheet.append_row([username, name, address, phone, city, chronic, viral, treatment_date])
         except Exception as e:
             print(f"Error saving to Sheets: {e}")
         flash('Cuenta creada exitosamente. Ahora puedes iniciar sesión.')
@@ -93,12 +142,12 @@ def welcome():
     if 'username' in session:
         conn = sqlite3.connect('users.db')
         c = conn.cursor()
-        c.execute("SELECT name, address, phone, city FROM users WHERE username = ?", (session['username'],))
+        c.execute("SELECT name, address, phone, city, chronic_disease, viral_disease, treatment_date FROM users WHERE username = ?", (session['username'],))
         user_data = c.fetchone()
         conn.close()
         if user_data:
-            name, address, phone, city = user_data
-            return render_template('welcome.html', username=session['username'], name=name, address=address, phone=phone, city=city)
+            name, address, phone, city, chronic_disease, viral_disease, treatment_date = user_data
+            return render_template('welcome.html', username=session['username'], name=name, address=address, phone=phone, city=city, chronic_disease=chronic_disease, viral_disease=viral_disease, treatment_date=treatment_date)
         else:
             return redirect(url_for('home'))
     else:

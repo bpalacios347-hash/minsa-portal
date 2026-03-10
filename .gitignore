@@ -18,6 +18,9 @@ coverage.xml
 *.log
 .git
 .mypy_cache
+users.db
+credentials.json
+credenciales.json
 .pytest_cache
 .hypothesis
 node_modules/
