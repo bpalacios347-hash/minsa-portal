@@ -11,6 +11,10 @@ from datetime import datetime, timedelta
 app = Flask(__name__)
 app.secret_key = 'tu_clave_secreta_aqui'  # Cambia esto en producción
 
+# Configuración de sesiones persistentes
+app.config['SESSION_PERMANENT'] = True
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
+
 # Configuración de Google Sheets
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 SPREADSHEET_ID = "1jExxsuOZIecLZmjw4OaSEJdPwm34fjXLH-f2z59VDU0"
@@ -81,6 +85,8 @@ init_db()
 
 @app.route('/')
 def home():
+    if 'username' in session:
+        return redirect(url_for('welcome'))
     return render_template('index.html')
 
 @app.route('/register', methods=['POST'])
@@ -132,6 +138,7 @@ def login():
 
     if user and check_password_hash(user[0], password):
         session['username'] = username
+        session.permanent = True
         return redirect(url_for('welcome'))
     else:
         flash('Nombre de usuario o contraseña incorrectos.')
