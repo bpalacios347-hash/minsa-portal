@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Portal Médico</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            margin: 0;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #1a5276;
+            margin-bottom: 10px;
+        }
+        .header a {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #1a5276;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+        }
+        .header a:hover {
+            background: #154360;
+        }
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+        }
+        .card h2 {
+            color: #1a5276;
+            margin-bottom: 15px;
+            font-size: 1.5rem;
+        }
+        .card p, .card ul {
+            color: #2c3e50;
+            line-height: 1.6;
+        }
+        .card ul {
+            list-style: none;
+            padding: 0;
+        }
+        .card li {
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Bienvenido, {{ username }}!</h1>
+        <a href="/logout">Cerrar Sesión</a>
+    </div>
+    <div class="dashboard">
+        <div class="card">
+            <h2>Mi Expediente</h2>
+            <p>Número de Expediente: {{ username }}</p>
+            <p>Estado: Activo</p>
+        </div>
+        <div class="card">
+            <h2>Mis Citas</h2>
+            <ul>
+                <li>Consulta General - 15/03/2026 - 10:00 AM</li>
+                <li>Revisión Dental - 20/03/2026 - 2:00 PM</li>
+            </ul>
+        </div>
+        <div class="card">
+            <h2>Hospitales</h2>
+            <ul>
+                <li>Hospital Vivian Pellas - Managua</li>
+                <li>Hospital Alemán Nicaragüense - Managua</li>
+                <li>Hospital Monte España - Managua</li>
+            </ul>
+        </div>
+        <div class="card">
+            <h2>Información Personal</h2>
+            <p>Nombre: {{ name }}</p>
+            <p>Dirección: {{ address }}</p>
+            <p>Teléfono: {{ phone }}</p>
+            <p>Ciudad: {{ city }}</p>
+        </div>
+    </div>
+</body>
+</html>
