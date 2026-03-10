@@ -22,6 +22,9 @@ def get_sheet():
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
     client = gspread.authorize(creds)
     sheet = client.open_by_key(SPREADSHEET_ID).sheet1
+    # Agregar encabezados si la sheet está vacía
+    if sheet.row_count == 0:
+        sheet.append_row(["Expediente", "Nombre", "Dirección", "Teléfono", "Ciudad"])
     return sheet
 
 # Crear base de datos si no existe
