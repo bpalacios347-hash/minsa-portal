@@ -187,7 +187,7 @@
     <div class="container">
         <!-- Logo del MINSA Nicaragua (Imagen proporcionada) -->
         <div class="logo-container">
-            <img src="/static/images.png" alt="Logo MINSA Nicaragua">
+            <img src="{{ url_for('static', filename='images.png') }}" alt="Logo MINSA Nicaragua">
         </div>
 
         {% with messages = get_flashed_messages() %}
