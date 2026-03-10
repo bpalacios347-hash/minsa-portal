@@ -1,10 +1,31 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 import sqlite3
 import os
+import json
 from werkzeug.security import generate_password_hash, check_password_hash
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
 app = Flask(__name__)
 app.secret_key = 'tu_clave_secreta_aqui'  # Cambia esto en producción
+
+# Configuración de Google Sheets
+SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+SPREADSHEET_ID = "1jExxsuOZIecLZmjw4OaSEJdPwm34fjXLH-f2z59VDU0"
+
+def get_sheet():
+    # Intentar leer de variable de entorno (para Render)
+    creds_json = os.environ.get('GOOGLE_CREDENTIALS')
+    if creds_json:
+        creds_dict = json.loads(creds_json)
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
+    else:
+        # Leer de archivo (para local)
+        CREDS_FILE = "credentials.json"
+        creds = ServiceAccountCredentials.from_json_keyfile_name(CREDS_FILE, SCOPE)
+    client = gspread.authorize(creds)
+    sheet = client.open_by_key(SPREADSHEET_ID).sheet1
+    return sheet
 
 # Crear base de datos si no existe
 def init_db():
@@ -36,10 +57,17 @@ def register():
     try:
         c.execute("INSERT INTO users (username, password, name, address, phone, city) VALUES (?, ?, ?, ?, ?, ?)", (username, hashed_password, name, address, phone, city))
         conn.commit()
+        # Guardar en Google Sheets
+        try:
+            sheet = get_sheet()
+            sheet.append_row([username, name, address, phone, city])
+        except Exception as e:
+            print(f"Error saving to Sheets: {e}")
         flash('Cuenta creada exitosamente. Ahora puedes iniciar sesión.')
     except sqlite3.IntegrityError:
         flash('El nombre de usuario ya existe.')
-    conn.close()
+    finally:
+        conn.close()
     return redirect(url_for('home'))
 
 @app.route('/login', methods=['POST'])
