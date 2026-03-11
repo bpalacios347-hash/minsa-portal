@@ -51,6 +51,9 @@ VIRAL_DISEASES = [
     "Zika"
 ]
 
+def get_conn():
+    return sqlite3.connect('/tmp/users.db')
+
 def get_sheet():
     creds_json = os.environ.get('GOOGLE_CREDENTIALS')
     if not creds_json:
