@@ -6,6 +6,25 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import secrets
+
+try:
+    import psycopg2
+    HAS_PSYCOPG2 = True
+except ImportError:
+    HAS_PSYCOPG2 = False
+
+# Database config
+db_url = os.environ.get('DATABASE_URL')
+if db_url and HAS_PSYCOPG2:
+    db_type = 'postgres'
+else:
+    db_type = 'sqlite'
+
+def get_conn():
+    if db_type == 'postgres':
+        return psycopg2.connect(db_url)
+    else:
+        return sqlite3.connect('users.db')
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
@@ -61,24 +80,24 @@ def get_sheet():
 
 # Crear base de datos si no existe
 def init_db():
-    conn = sqlite3.connect('users.db')
+    conn = get_conn()
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS users
                  (id INTEGER PRIMARY KEY, username TEXT UNIQUE, password TEXT, name TEXT, address TEXT, phone TEXT, city TEXT, chronic_disease TEXT, viral_disease TEXT, treatment_date TEXT)''')
     c.execute('''CREATE TABLE IF NOT EXISTS sessions
-                 (id INTEGER PRIMARY KEY, user_id INTEGER, token TEXT UNIQUE, expires_at TEXT, FOREIGN KEY(user_id) REFERENCES users(id))''')
+                 (id INTEGER PRIMARY KEY, user_id INTEGER, token TEXT UNIQUE, expires_at TEXT)''')
     # Add new columns if not exist
     try:
         c.execute("ALTER TABLE users ADD COLUMN chronic_disease TEXT")
-    except sqlite3.OperationalError:
+    except:
         pass
     try:
         c.execute("ALTER TABLE users ADD COLUMN viral_disease TEXT")
-    except sqlite3.OperationalError:
+    except:
         pass
     try:
         c.execute("ALTER TABLE users ADD COLUMN treatment_date TEXT")
-    except sqlite3.OperationalError:
+    except:
         pass
     conn.commit()
     conn.close()
@@ -88,9 +107,9 @@ init_db()
 def check_token():
     token = request.cookies.get('session_token')
     if token:
-        conn = sqlite3.connect('users.db')
+        conn = get_conn()
         c = conn.cursor()
-        c.execute("SELECT user_id, expires_at FROM sessions WHERE token = ?", (token,))
+        c.execute("SELECT user_id, expires_at FROM sessions WHERE token = %s", (token,))
         session_data = c.fetchone()
         conn.close()
         if session_data:
@@ -98,9 +117,9 @@ def check_token():
             expires_at = datetime.fromisoformat(expires_at_str)
             if datetime.now() < expires_at:
                 # Set session
-                conn = sqlite3.connect('users.db')
+                conn = get_conn()
                 c = conn.cursor()
-                c.execute("SELECT username FROM users WHERE id = ?", (user_id,))
+                c.execute("SELECT username FROM users WHERE id = %s", (user_id,))
                 user = c.fetchone()
                 conn.close()
                 if user:
@@ -132,10 +151,10 @@ def register():
     random_date = start_date + timedelta(days=random.randint(0, (end_date - start_date).days))
     treatment_date = random_date.strftime("%d/%m/%Y")
 
-    conn = sqlite3.connect('users.db')
+    conn = get_conn()
     c = conn.cursor()
     try:
-        c.execute("INSERT INTO users (username, password, name, address, phone, city, chronic_disease, viral_disease, treatment_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (username, hashed_password, name, address, phone, city, chronic, viral, treatment_date))
+        c.execute("INSERT INTO users (username, password, name, address, phone, city, chronic_disease, viral_disease, treatment_date) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)", (username, hashed_password, name, address, phone, city, chronic, viral, treatment_date))
         conn.commit()
         # Guardar en Google Sheets
         try:
@@ -144,7 +163,7 @@ def register():
         except Exception as e:
             print(f"Error saving to Sheets: {e}")
         flash('Cuenta creada exitosamente. Ahora puedes iniciar sesión.')
-    except sqlite3.IntegrityError:
+    except:
         flash('El nombre de usuario ya existe.')
     finally:
         conn.close()
@@ -155,9 +174,9 @@ def login():
     username = request.form['username']
     password = request.form['password']
 
-    conn = sqlite3.connect('users.db')
+    conn = get_conn()
     c = conn.cursor()
-    c.execute("SELECT id, password FROM users WHERE username = ?", (username,))
+    c.execute("SELECT id, password FROM users WHERE username = %s", (username,))
     user = c.fetchone()
     conn.close()
 
@@ -168,9 +187,9 @@ def login():
         # Generate token
         token = secrets.token_urlsafe(32)
         expires_at = datetime.now() + timedelta(days=30)
-        conn = sqlite3.connect('users.db')
+        conn = get_conn()
         c = conn.cursor()
-        c.execute("INSERT INTO sessions (user_id, token, expires_at) VALUES (?, ?, ?)", (user_id, token, expires_at.isoformat()))
+        c.execute("INSERT INTO sessions (user_id, token, expires_at) VALUES (%s, %s, %s)", (user_id, token, expires_at.isoformat()))
         conn.commit()
         conn.close()
         resp = redirect(url_for('welcome'))
@@ -186,9 +205,9 @@ def welcome():
         if not check_token():
             return redirect(url_for('home'))
     if 'username' in session:
-        conn = sqlite3.connect('users.db')
+        conn = get_conn()
         c = conn.cursor()
-        c.execute("SELECT name, address, phone, city, chronic_disease, viral_disease, treatment_date FROM users WHERE username = ?", (session['username'],))
+        c.execute("SELECT name, address, phone, city, chronic_disease, viral_disease, treatment_date FROM users WHERE username = %s", (session['username'],))
         user_data = c.fetchone()
         conn.close()
         if user_data:
@@ -203,9 +222,9 @@ def welcome():
 def logout():
     token = request.cookies.get('session_token')
     if token:
-        conn = sqlite3.connect('users.db')
+        conn = get_conn()
         c = conn.cursor()
-        c.execute("DELETE FROM sessions WHERE token = ?", (token,))
+        c.execute("DELETE FROM sessions WHERE token = %s", (token,))
         conn.commit()
         conn.close()
     session.pop('username', None)
