@@ -140,39 +140,44 @@ def home():
 
 @app.route('/register', methods=['POST'])
 def register():
-    username = request.form['username']
-    password = request.form['password']
-    name = request.form['name']
-    address = request.form['address']
-    phone = request.form['phone']
-    city = request.form['city']
-    hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
-
-    # Generate random diseases and date
-    chronic = random.choice(CHRONIC_DISEASES)
-    viral = random.choice(VIRAL_DISEASES)
-    start_date = datetime(2020, 1, 1)
-    end_date = datetime.now()
-    random_date = start_date + timedelta(days=random.randint(0, (end_date - start_date).days))
-    treatment_date = random_date.strftime("%d/%m/%Y")
-
-    conn = get_conn()
-    c = conn.cursor()
     try:
-        c.execute("INSERT INTO users (username, password, name, address, phone, city, chronic_disease, viral_disease, treatment_date) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)", (username, hashed_password, name, address, phone, city, chronic, viral, treatment_date))
-        conn.commit()
-        # Guardar en Google Sheets
+        username = request.form['username']
+        password = request.form['password']
+        name = request.form['name']
+        address = request.form['address']
+        phone = request.form['phone']
+        city = request.form['city']
+        hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
+
+        # Generate random diseases and date
+        chronic = random.choice(CHRONIC_DISEASES)
+        viral = random.choice(VIRAL_DISEASES)
+        start_date = datetime(2020, 1, 1)
+        end_date = datetime.now()
+        random_date = start_date + timedelta(days=random.randint(0, (end_date - start_date).days))
+        treatment_date = random_date.strftime("%d/%m/%Y")
+
+        conn = get_conn()
+        c = conn.cursor()
         try:
-            sheet = get_sheet()
-            if sheet:
-                sheet.append_row([username, name, address, phone, city, chronic, viral, treatment_date])
+            c.execute("INSERT INTO users (username, password, name, address, phone, city, chronic_disease, viral_disease, treatment_date) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)", (username, hashed_password, name, address, phone, city, chronic, viral, treatment_date))
+            conn.commit()
+            # Guardar en Google Sheets
+            try:
+                sheet = get_sheet()
+                if sheet:
+                    sheet.append_row([username, name, address, phone, city, chronic, viral, treatment_date])
+            except Exception as e:
+                print(f"Error saving to Sheets: {e}")
+            flash('Cuenta creada exitosamente. Ahora puedes iniciar sesión.')
         except Exception as e:
-            print(f"Error saving to Sheets: {e}")
-        flash('Cuenta creada exitosamente. Ahora puedes iniciar sesión.')
-    except:
-        flash('El nombre de usuario ya existe.')
-    finally:
-        conn.close()
+            print(f"Error in db insert: {e}")
+            flash('El nombre de usuario ya existe.')
+        finally:
+            conn.close()
+    except Exception as e:
+        print(f"Error in register: {e}")
+        flash('Error interno del servidor.')
     return redirect(url_for('home'))
 
 @app.route('/login', methods=['POST'])
