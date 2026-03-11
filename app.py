@@ -71,10 +71,9 @@ VIRAL_DISEASES = [
 ]
 
 def get_sheet():
-    # Leer de variable de entorno (para Render)
     creds_json = os.environ.get('GOOGLE_CREDENTIALS')
     if not creds_json:
-        raise ValueError("GOOGLE_CREDENTIALS no configurada")
+        return None
     creds_dict = json.loads(creds_json)
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
     client = gspread.authorize(creds)
@@ -165,7 +164,8 @@ def register():
         # Guardar en Google Sheets
         try:
             sheet = get_sheet()
-            sheet.append_row([username, name, address, phone, city, chronic, viral, treatment_date])
+            if sheet:
+                sheet.append_row([username, name, address, phone, city, chronic, viral, treatment_date])
         except Exception as e:
             print(f"Error saving to Sheets: {e}")
         flash('Cuenta creada exitosamente. Ahora puedes iniciar sesión.')
