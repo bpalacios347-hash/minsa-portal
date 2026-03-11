@@ -139,7 +139,7 @@ def register():
         start_date = datetime(2020, 1, 1)
         end_date = datetime.now()
         random_date = start_date + timedelta(days=random.randint(0, (end_date - start_date).days))
-    treatment_date = f"{random_date.day:02d}/{random_date.month:02d}/{random_date.year}"
+    treatment_date = "{:02d}/{:02d}/{}".format(random_date.day, random_date.month, random_date.year)
         conn = get_conn()
         c = conn.cursor()
         try:
