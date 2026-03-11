@@ -12,25 +12,6 @@ try:
     HAS_PSYCOPG2 = True
 except ImportError:
     HAS_PSYCOPG2 = False
-
-# Database config
-db_url = os.environ.get('DATABASE_URL')
-if db_url and HAS_PSYCOPG2:
-    db_type = 'postgres'
-else:
-    db_type = 'sqlite'
-
-def get_conn():
-    global db_type
-    if db_type == 'postgres':
-        try:
-            return psycopg2.connect(db_url)
-        except Exception as e:
-            print(f"Error connecting to PostgreSQL: {e}. Falling back to SQLite.")
-            db_type = 'sqlite'
-            return sqlite3.connect('users.db')
-    else:
-        return sqlite3.connect('users.db')
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
@@ -88,9 +69,9 @@ def init_db():
     conn = get_conn()
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS users
-                 (id SERIAL PRIMARY KEY, username TEXT UNIQUE, password TEXT, name TEXT, address TEXT, phone TEXT, city TEXT, chronic_disease TEXT, viral_disease TEXT, treatment_date TEXT)''')
+                 (id INTEGER PRIMARY KEY, username TEXT UNIQUE, password TEXT, name TEXT, address TEXT, phone TEXT, city TEXT, chronic_disease TEXT, viral_disease TEXT, treatment_date TEXT)''')
     c.execute('''CREATE TABLE IF NOT EXISTS sessions
-                 (id SERIAL PRIMARY KEY, user_id INTEGER, token TEXT UNIQUE, expires_at TEXT)''')
+                 (id INTEGER PRIMARY KEY, user_id INTEGER, token TEXT UNIQUE, expires_at TEXT)''')
     # Add new columns if not exist
     try:
         c.execute("ALTER TABLE users ADD COLUMN chronic_disease TEXT")
@@ -114,7 +95,7 @@ def check_token():
     if token:
         conn = get_conn()
         c = conn.cursor()
-        c.execute("SELECT user_id, expires_at FROM sessions WHERE token = %s", (token,))
+        c.execute("SELECT user_id, expires_at FROM sessions WHERE token = ?", (token,))
         session_data = c.fetchone()
         conn.close()
         if session_data:
@@ -124,7 +105,7 @@ def check_token():
                 # Set session
                 conn = get_conn()
                 c = conn.cursor()
-                c.execute("SELECT username FROM users WHERE id = %s", (user_id,))
+                c.execute("SELECT username FROM users WHERE id = ?", (user_id,))
                 user = c.fetchone()
                 conn.close()
                 if user:
@@ -160,7 +141,7 @@ def register():
         conn = get_conn()
         c = conn.cursor()
         try:
-            c.execute("INSERT INTO users (username, password, name, address, phone, city, chronic_disease, viral_disease, treatment_date) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)", (username, hashed_password, name, address, phone, city, chronic, viral, treatment_date))
+            c.execute("INSERT INTO users (username, password, name, address, phone, city, chronic_disease, viral_disease, treatment_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (username, hashed_password, name, address, phone, city, chronic, viral, treatment_date))
             conn.commit()
             # Guardar en Google Sheets
             try:
@@ -187,7 +168,7 @@ def login():
 
     conn = get_conn()
     c = conn.cursor()
-    c.execute("SELECT id, password FROM users WHERE username = %s", (username,))
+    c.execute("SELECT id, password FROM users WHERE username = ?", (username,))
     user = c.fetchone()
     conn.close()
 
@@ -200,7 +181,7 @@ def login():
         expires_at = datetime.now() + timedelta(days=30)
         conn = get_conn()
         c = conn.cursor()
-        c.execute("INSERT INTO sessions (user_id, token, expires_at) VALUES (%s, %s, %s)", (user_id, token, expires_at.isoformat()))
+        c.execute("INSERT INTO sessions (user_id, token, expires_at) VALUES (?, ?, ?)", (user_id, token, expires_at.isoformat()))
         conn.commit()
         conn.close()
         resp = redirect(url_for('welcome'))
@@ -218,7 +199,7 @@ def welcome():
     if 'username' in session:
         conn = get_conn()
         c = conn.cursor()
-        c.execute("SELECT name, address, phone, city, chronic_disease, viral_disease, treatment_date FROM users WHERE username = %s", (session['username'],))
+        c.execute("SELECT name, address, phone, city, chronic_disease, viral_disease, treatment_date FROM users WHERE username = ?", (session['username'],))
         user_data = c.fetchone()
         conn.close()
         if user_data:
@@ -235,7 +216,7 @@ def logout():
     if token:
         conn = get_conn()
         c = conn.cursor()
-        c.execute("DELETE FROM sessions WHERE token = %s", (token,))
+        c.execute("DELETE FROM sessions WHERE token = ?", (token,))
         conn.commit()
         conn.close()
     session.pop('username', None)
