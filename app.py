@@ -21,8 +21,14 @@ else:
     db_type = 'sqlite'
 
 def get_conn():
+    global db_type
     if db_type == 'postgres':
-        return psycopg2.connect(db_url)
+        try:
+            return psycopg2.connect(db_url)
+        except Exception as e:
+            print(f"Error connecting to PostgreSQL: {e}. Falling back to SQLite.")
+            db_type = 'sqlite'
+            return sqlite3.connect('users.db')
     else:
         return sqlite3.connect('users.db')
 from datetime import datetime, timedelta
@@ -83,9 +89,9 @@ def init_db():
     conn = get_conn()
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS users
-                 (id INTEGER PRIMARY KEY, username TEXT UNIQUE, password TEXT, name TEXT, address TEXT, phone TEXT, city TEXT, chronic_disease TEXT, viral_disease TEXT, treatment_date TEXT)''')
+                 (id SERIAL PRIMARY KEY, username TEXT UNIQUE, password TEXT, name TEXT, address TEXT, phone TEXT, city TEXT, chronic_disease TEXT, viral_disease TEXT, treatment_date TEXT)''')
     c.execute('''CREATE TABLE IF NOT EXISTS sessions
-                 (id INTEGER PRIMARY KEY, user_id INTEGER, token TEXT UNIQUE, expires_at TEXT)''')
+                 (id SERIAL PRIMARY KEY, user_id INTEGER, token TEXT UNIQUE, expires_at TEXT)''')
     # Add new columns if not exist
     try:
         c.execute("ALTER TABLE users ADD COLUMN chronic_disease TEXT")
