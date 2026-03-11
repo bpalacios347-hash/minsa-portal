@@ -110,7 +110,6 @@ def check_token():
 
 @app.route('/')
 def home():
-    check_token()
     if 'username' in session:
         return redirect(url_for('welcome'))
     return render_template('index.html')
@@ -183,7 +182,9 @@ def login():
 
 @app.route('/welcome')
 def welcome():
-    check_token()
+    if 'username' not in session:
+        if not check_token():
+            return redirect(url_for('home'))
     if 'username' in session:
         conn = sqlite3.connect('users.db')
         c = conn.cursor()
